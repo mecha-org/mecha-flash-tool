@@ -1,0 +1,3 @@
+[submodule "lib/uuu-rs/vendor/mfgtools"]
+	path = lib/uuu-rs/vendor/mfgtools
+	url = https://github.com/nxp-imx/mfgtools
