@@ -1,0 +1,47 @@
+SDP: boot -f _flash.bin -scanlimited 0x800000
+SDPV: delay 1000
+SDPV: write -f _flash.bin -skipspl -scanterm -scanlimited 0x800000
+SDPV: jump -scanlimited 0x800000
+FB: ucmd setenv fastboot_dev mmc
+FB: ucmd setenv mmcdev ${emmc_dev}
+FB: ucmd mmc dev ${emmc_dev}
+FB: flash -scanterm -scanlimited 0x800000 bootloader _flash.bin
+FB: ucmd if env exists emmc_ack; then ; else setenv emmc_ack 0; fi;
+FB: ucmd mmc partconf ${emmc_dev} ${emmc_ack} 1 0
+FB: ucmd setenv fastboot_buffer ${loadaddr}
+FB: download -f Image 
+FB: ucmd setenv fastboot_buffer ${fdt_addr}
+FB: download -f imx8mm-mecha-comet-m-gen1.dtb
+FB: ucmd setenv fdtfile imx8mm-mecha-comet-m-gen1.dtb
+FB: ucmd printenv fdtfile 
+FB: ucmd setenv fastboot_buffer ${initrd_addr}
+FB: download -f mecha-image-mfgtool-initramfs-mecha-comet-m-gen1-20240702102938.rootfs.cpio.gz.u-boot
+FB: ucmd setenv mfgtool_args ${mfgtool_args} mfg_mmcdev=${emmc_dev}
+FB: ucmd run mfgtool_args
+FB: ucmd setenv bootargs root=/dev/ram0 rdinit=/linuxrc rw
+FB: ucmd printenv fdtfile
+FB: acmd booti ${loadaddr} ${initrd_addr} ${fdt_addr}
+FBK: ucmd sleep 3
+FBK: ucmd cmdline=`cat /proc/cmdline`;cmdline=${cmdline#*mfg_mmcdev=};cmds=($cmdline);echo ${cmds[0]}>/tmp/mmcdev
+FBK: ucmd sleep 1
+FBK: ucmd mmc=`cat /tmp/mmcdev`; while [ ! -e /dev/mmcblk2 ]; do sleep 1; echo "wait for /dev/mmcblk2 appear"; done;
+FBK: ucmd sleep 1
+FBK: ucmd parted /dev/mmcblk2 --script mklabel msdos
+FBK: ucmd lsblk
+FBK: ucmd parted /dev/mmcblk2 -- mkpart primary FAT16 10MB 195MB
+FBK: ucmd mkfs.vfat /dev/mmcblk2p1
+FBK: ucmd parted /dev/mmcblk2 -- mkpart primary ext4 205MB 10000MB
+FBK: ucmd mkfs.ext4 /dev/mmcblk2p2
+FBK: ucmd parted /dev/mmcblk2 -- mkpart primary ext4 10005MB 29000MB
+FBK: ucmd mkfs.ext4 /dev/mmcblk2p3
+FBK: ucmd mmc=`cat /tmp/mmcdev`; mkdir -p /mnt
+FBK: ucmd mmc=`cat /tmp/mmcdev`; mount -t ext4 /dev/mmcblk2p2 /mnt
+FBK: ucmd mmc=`cat /tmp/mmcdev`; mkdir -p /mnt/boot
+FBK: ucmd mmc=`cat /tmp/mmcdev`; mount -t vfat /dev/mmcblk2p1 /mnt/boot
+FBK: ucmd mmc=`cat /tmp/mmcdev`; mkdir -p /mnt/home
+FBK: ucmd mmc=`cat /tmp/mmcdev`; mount -t ext4 /dev/mmcblk2p3 /mnt/home
+FBK: acmd EXTRACT_UNSAFE_SYMLINKS=1 tar -z -x -C /mnt
+FBK: ucp _image t:- /mnt
+FBK: ucmd sleep 45
+FBK: ucmd sync
+FBK: DONE
