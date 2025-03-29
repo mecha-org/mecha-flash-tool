@@ -1,7 +1,3 @@
-use include_dir::{Dir, include_dir};
-
-static SCRIPTS_DIR: Dir = include_dir!("./cli/scripts/");
-
 #[derive(Debug)]
 pub struct Script {
     pub commands: Vec<String>,
@@ -20,23 +16,6 @@ impl Script {
                 s.to_string()
             })
             .collect();
-        Self { commands }
-    }
-
-    /// Default script (for iMX8MM)
-    pub fn default() -> Self {
-        let commands = SCRIPTS_DIR.get_file("mecha-comet-gen1-r5.auto").unwrap();
-        let commands = commands.contents_utf8().unwrap();
-        let commands = commands
-            .lines()
-            .map(|s| {
-                if s.starts_with('#') {
-                    return String::new();
-                }
-                s.to_string()
-            })
-            .collect();
-        println!("{:?}", commands);
         Self { commands }
     }
 
@@ -84,7 +63,6 @@ impl Script {
                 }
             }
         }
-        println!("Script execution completed.");
         Ok(())
     }
 }
