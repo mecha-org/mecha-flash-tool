@@ -6,6 +6,8 @@ fn main() {
     let render_config = get_render_config();
     inquire::set_global_render_config(render_config);
     let cli = Cli::parse();
+    let mut nt_handler = uuu_rs::notification::NotificationHandler::new();
+    uuu_rs::notification::register_notification_callback(&mut nt_handler);
 
     match &cli.command {
         Commands::Devices => commands::handle_devices(),

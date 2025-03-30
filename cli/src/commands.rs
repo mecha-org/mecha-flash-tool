@@ -45,7 +45,7 @@ struct Manifest {
 }
 
 pub fn handle_devices() {
-    uuu_rs::print_devices();
+    uuu_rs::devices::print_devices();
 }
 
 pub fn handle_flash(image: &str) {
@@ -72,8 +72,8 @@ pub fn handle_flash(image: &str) {
     }
 
     println!("Searching for device...");
-    uuu_rs::print_devices();
-    let devices = uuu_rs::get_devices();
+    uuu_rs::devices::print_devices();
+    let devices = uuu_rs::devices::get_devices();
     if devices.is_empty() {
         println!("{}", "Check the device connection and try again.".red());
         return;
@@ -131,6 +131,7 @@ pub fn handle_flash(image: &str) {
     }
 
     std::env::set_current_dir(current_dir).unwrap();
+    temp_dir.close().unwrap();
 }
 
 pub fn handle_script(script: &str) {
@@ -154,8 +155,8 @@ pub fn handle_script(script: &str) {
     }
 
     println!("Searching for device...");
-    uuu_rs::print_devices();
-    let devices = uuu_rs::get_devices();
+    uuu_rs::devices::print_devices();
+    let devices = uuu_rs::devices::get_devices();
     if devices.is_empty() {
         return;
     }
