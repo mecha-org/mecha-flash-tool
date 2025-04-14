@@ -1,7 +1,10 @@
 use crate::script::Script;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use inquire::{Confirm, Text};
+use inquire::{
+    ui::{Color, RenderConfig, Styled},
+    Confirm, InquireError, Text,
+};
 use serde::Deserialize;
 
 #[derive(Parser)]
@@ -188,22 +191,56 @@ pub fn handle_script(script: &str) {
 
 pub fn handle_shell() {
     println!("Enter command on prompt, or type 'exit' to quit");
+
+    let mut last_command_succeeded = true; // Start with default/success state
+
     loop {
-        let cmd: String = Text::new("").prompt().unwrap();
-        match cmd.as_str() {
+        let prompt_style = if last_command_succeeded {
+            Styled::new(">").with_fg(Color::LightGreen)
+        } else {
+            Styled::new(">").with_fg(Color::LightRed)
+        };
+
+        let render_config = RenderConfig::default().with_prompt_prefix(prompt_style);
+
+        let cmd_result = Text::new("") 
+            .with_render_config(render_config)
+            .prompt();
+
+        let cmd = match cmd_result {
+            Ok(c) => c,
+            Err(InquireError::OperationCanceled) => {
+                println!("Operation cancelled. Exiting.");
+                break; // Exit if user cancels (Ctrl+C)
+            }
+            Err(InquireError::OperationInterrupted) => {
+                println!("Operation interrupted. Exiting.");
+                break; // Exit if user interrupts (Ctrl+D often)
+            }
+            Err(e) => {
+                eprintln!("Prompt error: {}", e);
+                last_command_succeeded = false;
+                continue; 
+            }
+        };
+
+        match cmd.trim() {
             "exit" | "quit" => break,
-            "" => {}
-            _ => {
-                let cmd_status = uuu_rs::run_command(&cmd);
+            "" => {
+            }
+            command_to_run => {
+                let cmd_status = uuu_rs::run_command(command_to_run);
                 match cmd_status {
                     Ok(()) => {
-                        println!("Command executed successfully");
+                        last_command_succeeded = true;
                     }
                     Err(e) => {
+                        last_command_succeeded = false;
                         println!("Error: {}", e);
                     }
                 }
             }
         }
     }
+    println!("Exiting shell.");
 }

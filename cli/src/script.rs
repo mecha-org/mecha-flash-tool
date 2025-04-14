@@ -1,3 +1,5 @@
+use colored::Colorize;
+
 #[derive(Debug)]
 pub struct Script {
     pub commands: Vec<String>,
@@ -54,7 +56,7 @@ impl Script {
     /// Run the script
     pub fn run(&self) -> Result<(), String> {
         for command in &self.commands {
-            println!("> {}", command);
+            println!("> {}", command.cyan());
             let cmd_status = uuu_rs::run_command(command);
             match cmd_status {
                 Ok(()) => {}
