@@ -3,22 +3,25 @@ use colored::Colorize;
 #[derive(Debug)]
 pub struct Script {
     pub commands: Vec<String>,
+    pub uuu_version: Option<String>,
 }
 
 impl Script {
     /// Create a new runnable script from a file
     pub fn new(file: &str) -> Self {
         let contents = std::fs::read_to_string(file).unwrap();
+        let mut uuu_version = None;
         let commands = contents
             .lines()
-            .map(|s| {
-                if s.starts_with('#') {
-                    return String::new();
-                }
-                s.to_string()
+            .filter(|s| {
+                !s.starts_with("uuu_version") && !s.starts_with('#') && !s.trim().is_empty()
             })
+            .map(|s| s.to_string())
             .collect();
-        Self { commands }
+        Self {
+            commands,
+            uuu_version,
+        }
     }
 
     /// Use the image to flash the device
@@ -34,7 +37,11 @@ impl Script {
                 }
             })
             .collect();
-        Self { commands }
+        let uuu_version = self.uuu_version;
+        Self {
+            commands,
+            uuu_version,
+        }
     }
 
     /// Use the bootloader to flash the device
@@ -50,7 +57,11 @@ impl Script {
                 }
             })
             .collect();
-        Self { commands }
+        let uuu_version = self.uuu_version;
+        Self {
+            commands,
+            uuu_version,
+        }
     }
 
     /// Run the script

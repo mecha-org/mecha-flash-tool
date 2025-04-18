@@ -51,14 +51,7 @@ pub fn handle_devices() {
     uuu_rs::devices::print_devices();
 }
 
-pub fn handle_flash(image: &str) {
-    // Checck if the file exists
-    if !std::path::Path::new(image).exists() {
-        println!("{} does not exist.", image.red().bold());
-        return;
-    }
-
-    // Setup prompts
+fn _setup_prompts() -> bool {
     let ans = Confirm::new("Is the device in SERIAL mode?")
         .with_default(true)
         .with_help_message(
@@ -71,7 +64,7 @@ pub fn handle_flash(image: &str) {
             "{}",
             "Please connect the device in SERIAL mode and try again.".cyan()
         );
-        return;
+        return false;
     }
 
     println!("Searching for device...");
@@ -79,6 +72,21 @@ pub fn handle_flash(image: &str) {
     let devices = uuu_rs::devices::get_devices();
     if devices.is_empty() {
         println!("{}", "Check the device connection and try again.".red());
+        return false;
+    }
+
+    true
+}
+
+pub fn handle_flash(image: &str) {
+    // Checck if the file exists
+    if !std::path::Path::new(image).exists() {
+        println!("{} does not exist.", image.red().bold());
+        return;
+    }
+
+    // Setup prompt
+    if !_setup_prompts() {
         return;
     }
 
@@ -121,7 +129,9 @@ pub fn handle_flash(image: &str) {
     let current_dir = std::env::current_dir().unwrap();
     std::env::set_current_dir(temp_path).unwrap();
 
-    let script = Script::new(&manifest.script.name);
+    let script = Script::new(&manifest.script.name)
+        .with_image(&manifest.rootfs.name)
+        .with_bootloader(&manifest.bootloader.name);
     let script_status = script.run();
     match script_status {
         Ok(()) => {
@@ -144,23 +154,8 @@ pub fn handle_script(script: &str) {
         return;
     }
 
-    // Setup prompts
-    let ans = Confirm::new("Is the device in SERIAL mode?")
-        .with_default(true)
-        .with_help_message(
-            "Make sure to connect to the device's HOST USB port. Learn more [mecha.so/...]",
-        )
-        .prompt()
-        .unwrap();
-    if !ans {
-        println!("Please connect the device in SERIAL mode and try again.");
-        return;
-    }
-
-    println!("Searching for device...");
-    uuu_rs::devices::print_devices();
-    let devices = uuu_rs::devices::get_devices();
-    if devices.is_empty() {
+    // Setup prompt
+    if !_setup_prompts() {
         return;
     }
 
@@ -203,31 +198,28 @@ pub fn handle_shell() {
 
         let render_config = RenderConfig::default().with_prompt_prefix(prompt_style);
 
-        let cmd_result = Text::new("") 
-            .with_render_config(render_config)
-            .prompt();
+        let cmd_result = Text::new("").with_render_config(render_config).prompt();
 
         let cmd = match cmd_result {
             Ok(c) => c,
             Err(InquireError::OperationCanceled) => {
-                println!("Operation cancelled. Exiting.");
+                println!("Operation cancelled.");
                 break; // Exit if user cancels (Ctrl+C)
             }
             Err(InquireError::OperationInterrupted) => {
-                println!("Operation interrupted. Exiting.");
+                println!("Operation interrupted.");
                 break; // Exit if user interrupts (Ctrl+D often)
             }
             Err(e) => {
                 eprintln!("Prompt error: {}", e);
                 last_command_succeeded = false;
-                continue; 
+                continue;
             }
         };
 
         match cmd.trim() {
             "exit" | "quit" => break,
-            "" => {
-            }
+            "" => {}
             command_to_run => {
                 let cmd_status = uuu_rs::run_command(command_to_run);
                 match cmd_status {
