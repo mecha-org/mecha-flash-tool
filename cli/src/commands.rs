@@ -2,8 +2,8 @@ use crate::script::Script;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use inquire::{
-    ui::{Color, RenderConfig, Styled},
     Confirm, InquireError, Text,
+    ui::{Color, RenderConfig, Styled},
 };
 use serde::Deserialize;
 
@@ -32,19 +32,48 @@ pub enum Commands {
     Shell,
 }
 
-/// Manifest file structure (name, hash)
+/// Manifest schema
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
-struct Component {
+struct Package {
     name: String,
+    version: String,
+    size: u64,
+    sha2: String,
 }
+
+/// Machine information schema
+#[allow(dead_code)]
+#[derive(Deserialize, Debug)]
+struct MachineInfo {
+    name: String,
+    r#gen: String,
+    rev: String,
+}
+
+#[allow(dead_code)]
+#[derive(Deserialize, Debug)]
+struct Packages {
+    linux: Package,
+    rootfs: Package,
+    uboot: Package,
+    dtb: Package,
+    mfgtools: Package,
+    script: Package,
+}
+
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct Manifest {
-    kernel: Component,
-    rootfs: Component,
-    bootloader: Component,
-    dtb: Component,
-    initramfs: Component,
-    script: Component,
+    id: String,
+    version: String,
+    channel: String,
+    created_at: String,
+    description: String,
+    url: String,
+
+    machine: MachineInfo,
+    packages: Packages,
 }
 
 pub fn handle_devices() {
@@ -103,6 +132,7 @@ pub fn handle_flash(image: &str) {
     let temp_path = temp_dir.path();
 
     // Extract the package to the temporary directory
+    // TODO: Fix cleanup during force exit
     println!("{}", "Extracting package...".green());
     let file = std::fs::File::open(image).unwrap();
     let mut archive = zip::ZipArchive::new(file).unwrap();
@@ -121,7 +151,32 @@ pub fn handle_flash(image: &str) {
     // Verify the manifest
     let f = std::fs::File::open(&manifest).unwrap();
     let manifest: Manifest = serde_yml::from_reader(f).unwrap();
-    // TODO: Verify the hashes of the files
+
+    // TODO: Verify the manifest
+    // Check if all components are present
+    let components = vec![
+        &manifest.packages.linux,
+        &manifest.packages.rootfs,
+        &manifest.packages.uboot,
+        &manifest.packages.dtb,
+        &manifest.packages.mfgtools,
+        &manifest.packages.script,
+    ];
+
+    for component in components {
+        if !std::path::Path::new(&temp_path.join(&component.name)).exists() {
+            println!(
+                "{}",
+                format!("The package does not contain {}.", component.name).red()
+            );
+            return;
+        } else {
+            println!(
+                "{}",
+                format!("Found {}: {}", component.name, component.version).green()
+            );
+        }
+    }
 
     // Flash the image
     println!("{}", "Flashing image...".green());
@@ -129,10 +184,12 @@ pub fn handle_flash(image: &str) {
     let current_dir = std::env::current_dir().unwrap();
     std::env::set_current_dir(temp_path).unwrap();
 
-    let script = Script::new(&manifest.script.name)
-        .with_image(&manifest.rootfs.name)
-        .with_bootloader(&manifest.bootloader.name);
+    // Run the flashing script
+    let script = Script::new(&manifest.packages.script.name)
+        .with_image(&manifest.packages.rootfs.name)
+        .with_bootloader(&manifest.packages.uboot.name);
     let script_status = script.run();
+
     match script_status {
         Ok(()) => {
             println!("Script executed successfully");
@@ -148,7 +205,7 @@ pub fn handle_flash(image: &str) {
 }
 
 pub fn handle_script(script: &str) {
-    // Checck if the file exists
+    // Check if the file exists
     if !std::path::Path::new(script).exists() {
         println!("{} does not exist.", script);
         return;
@@ -195,11 +252,9 @@ pub fn handle_shell() {
         } else {
             Styled::new(">").with_fg(Color::LightRed)
         };
-
         let render_config = RenderConfig::default().with_prompt_prefix(prompt_style);
 
         let cmd_result = Text::new("").with_render_config(render_config).prompt();
-
         let cmd = match cmd_result {
             Ok(c) => c,
             Err(InquireError::OperationCanceled) => {
